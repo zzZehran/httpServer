@@ -1,0 +1,17 @@
+{
+  "name": "httpserver",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "merge-descriptors": "^2.0.0",
+    "path-to-regexp": "^8.2.0"
+  }
+}
