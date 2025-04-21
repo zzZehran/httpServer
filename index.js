@@ -1,7 +1,6 @@
 import http from "node:http";
 import mergeDescriptors from "merge-descriptors";
 import url from "node:url";
-import path from "path/posix";
 import { match } from "path-to-regexp";
 
 const USE_METHOD_STRING = "__USE";
@@ -10,32 +9,46 @@ export function initialize() {
   const routes = [];
 
   const lib = {
-    get: (path, handlerFn) => {
-      routes.push({ path, handlerFn, method: "GET" });
+    get: (path, ...handlerFn) => {
+      for (let handler of handlerFn) {
+        routes.push({ path, handler, method: "GET" });
+      }
     },
-    post: (path, handlerFn) => {
-      routes.push({ path, handlerFn, method: "POST" });
+    post: (path, ...handlerFn) => {
+      for (let handler of handlerFn) {
+        routes.push({ path, handler, method: "POST" });
+      }
     },
-    use: (pathOrHandler, handlerFn) => {
+    //read again
+    use: (pathOrHandler, ...handlerFn) => {
       if (typeof pathOrHandler === "function") {
         routes.push({
-          path: "*spat",
-          handlerFn: pathOrHandler,
+          path: "*splat",
+          handler: pathOrHandler,
           method: USE_METHOD_STRING,
         });
+        for (let handler of handlerFn) {
+          routes.push({
+            path: "*splat",
+            handler,
+            method: USE_METHOD_STRING,
+          });
+        }
       } else if (
         typeof pathOrHandler === "string" &&
-        typeof handlerFn === "function"
+        typeof Array.isArray(handlerFn)
       ) {
         pathOrHandler =
           pathOrHandler[pathOrHandler.length - 1] === "/"
             ? pathOrHandler.slice(0, pathOrHandler.length - 1)
             : pathOrHandler;
-        routes.push({
-          path: pathOrHandler + "{/*spat}",
-          handlerFn,
-          method: USE_METHOD_STRING,
-        });
+        for (let handler of handlerFn) {
+          routes.push({
+            path: pathOrHandler + "{/*splat}",
+            handler,
+            method: USE_METHOD_STRING,
+          });
+        }
       }
     },
   };
@@ -57,20 +70,19 @@ export function initialize() {
         return { route, params: isMatch.params };
       });
   }
-
   const server = http.createServer((req, res) => {
     const method = req.method;
     const path = url.parse(req.url).pathname;
-    // console.log(method, path);
+    req.path = path;
+    req.baseUrl = "";
 
     const matchedRoutes = matchRoutes(path, method);
-    console.log("Matched routes:", matchedRoutes);
     let i = 0;
     let handlerFn;
     function next() {
-      handlerFn = matchedRoutes[i]?.route?.handlerFn;
-      i += 1;
+      handlerFn = matchedRoutes[i]?.route?.handler;
       req.params = matchedRoutes[i]?.params;
+      i += 1;
       typeof handlerFn === "function" && handlerFn(req, res, next);
     }
     next();
