@@ -53,37 +53,49 @@ export function initialize() {
     },
   };
 
-  function matchRoutes(urlPathname, urlMethod) {
-    return routes
-      .filter((route) => {
-        const matchFn = match(route.path);
-        const isMatch = matchFn(urlPathname);
-        return (
-          isMatch &&
-          (urlMethod === route.method || route.method === USE_METHOD_STRING)
-        );
-      })
-      .map((route) => {
-        //read again
-        const matchFn = match(route.path);
-        const isMatch = matchFn(urlPathname);
-        return { route, params: isMatch.params };
-      });
+  function matchRoutes(urlPathname, urlMethod, err) {
+    return routes.filter((route) => {
+      const matchFn = match(route.path);
+      const isMatch = matchFn(urlPathname);
+      const isErrPassed = err !== undefined;
+      const isErrHandler = route.handler.length >= 4;
+      return (
+        isMatch &&
+        (urlMethod === route.method || route.method === USE_METHOD_STRING) &&
+        (isErrPassed ? isErrHandler : true)
+      );
+    });
+    // .map((route) => {
+    //   //read again
+    //   const matchFn = match(route.path);
+    //   const isMatch = matchFn(urlPathname);
+    //   return { route, params: isMatch.params };
+    // });
   }
+
   const server = http.createServer((req, res) => {
+    // console.log(routes); //passed
     const method = req.method;
     const path = url.parse(req.url).pathname;
     req.path = path;
     req.baseUrl = "";
 
-    const matchedRoutes = matchRoutes(path, method);
     let i = 0;
+    let matchedRoutes;
     let handlerFn;
-    function next() {
-      handlerFn = matchedRoutes[i]?.route?.handler;
+    function next(err) {
+      if (i === 0) {
+        matchedRoutes = matchRoutes(path, method, err);
+      }
+      // handlerFn = matchedRoutes[i]?.route?.handler; //error
+      handlerFn = matchedRoutes[i]?.handler;
       req.params = matchedRoutes[i]?.params;
       i += 1;
-      typeof handlerFn === "function" && handlerFn(req, res, next);
+      if (handlerFn) {
+        err !== undefined
+          ? handlerFn(err, req, res, next)
+          : handlerFn(req, res, next);
+      }
     }
     next();
   });
